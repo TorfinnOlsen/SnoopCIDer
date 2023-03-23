@@ -50,26 +50,33 @@ func main() {
 	uniqueTCPAddrs := make(map[string]struct{})
 	uniqueWSAddrs := make(map[string]struct{})
 	uniqueHTTPSAddrs := make(map[string]struct{})
-	uniqueIDs := make(map[string]struct{})
 	frozenCount := 0
 	adsWithin6Months := 0
 
 	sixMonthsAgo := time.Now().AddDate(0, -6, 0)
 
+	uniquePublisherIDs := make(map[string]struct{})
+
 	for _, entry := range data {
-		for _, addr := range entry.AddrInfo.Addrs {
-			uniqueAddrs[addr] = struct{}{}
-			if strings.Contains(addr, "tcp") && !strings.Contains(addr, "https") && !strings.Contains(addr, "wss") {
-				uniqueTCPAddrs[addr] = struct{}{}
-			}
-			if strings.Contains(addr, "ws") && !strings.Contains(addr, "https") {
-				uniqueWSAddrs[addr] = struct{}{}
-			}
-			if strings.Contains(addr, "https") || strings.Contains(addr, "wss") {
-				uniqueHTTPSAddrs[addr] = struct{}{}
+		if _, exists := uniquePublisherIDs[entry.Publisher.ID]; !exists {
+			uniquePublisherIDs[entry.Publisher.ID] = struct{}{}
+
+			for _, publisherAddr := range entry.Publisher.Addrs {
+				uniqueAddrs[publisherAddr] = struct{}{}
+				if strings.Contains(publisherAddr, "tcp") && !strings.Contains(publisherAddr, "https") && !strings.Contains(publisherAddr, "wss") {
+					uniqueTCPAddrs[publisherAddr] = struct{}{}
+				}
+				if strings.Contains(publisherAddr, "ws") && !strings.Contains(publisherAddr, "https") {
+					uniqueWSAddrs[publisherAddr] = struct{}{}
+				}
+				if strings.Contains(publisherAddr, "https") || strings.Contains(publisherAddr, "wss") {
+					for _, providerAddr := range entry.AddrInfo.Addrs {
+						addrPair := fmt.Sprintf("%s : %s", publisherAddr, providerAddr)
+						uniqueHTTPSAddrs[addrPair] = struct{}{}
+					}
+				}
 			}
 		}
-		uniqueIDs[entry.AddrInfo.ID] = struct{}{}
 
 		if entry.FrozenAt != nil {
 			frozenCount++
@@ -81,11 +88,19 @@ func main() {
 		}
 	}
 
-	fmt.Println("Number of unique provider Addrs:", len(uniqueAddrs))
-	fmt.Println("Number of unique TCP provider Addrs:", len(uniqueTCPAddrs))
-	fmt.Println("Number of unique WS provider Addrs:", len(uniqueWSAddrs))
-	fmt.Println("Number of unique HTTPS provider Addrs:", len(uniqueHTTPSAddrs))
-	fmt.Println("Number of unique provider IDs:", len(uniqueIDs))
+	// Printing results
+	fmt.Println("Number of unique publisher Addrs:", len(uniqueAddrs))
+	fmt.Println("Number of unique TCP publisher Addrs:", len(uniqueTCPAddrs))
+	fmt.Println("Number of unique WS publisher Addrs:", len(uniqueWSAddrs))
+	fmt.Println("Number of unique HTTPS publisher Addrs:", len(uniqueHTTPSAddrs))
+
+	fmt.Println("HTTPS publisher addresses and their provider addresses:")
+	for addrPair := range uniqueHTTPSAddrs {
+		fmt.Printf("\t%s\n", addrPair)
+	}
+
+	fmt.Println("Number of unique publisher IDs:", len(uniquePublisherIDs))
 	fmt.Println("Number of FrozenAt entries:", frozenCount)
 	fmt.Println("Number of advertisements within the last 6 months:", adsWithin6Months)
+
 }
